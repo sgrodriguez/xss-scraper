@@ -50,26 +50,20 @@ def checkiadorDeUrls(cola_de_urls,cjto_urls_no_visitadas,cantidad_de_threads,sem
         # ACA ponemos un semaforo para eliminar el busy waiting y no hacer quilombo con las colas
         semaforo.acquire()
         if cola_de_urls.qsize() < cantidad_de_threads:
-            # creamos los threads que van a checkiar las urls
-            threadsParaCheckear = []
-            for i in range(cola_de_urls.qsize()):
-                thread = threading.Thread(target= checkearXSS, args=[cola_de_urls.get()])
-                threadsParaCheckear.append(thread)
-            for t in threadsParaCheckear:
-                t.start()
-            semaforo.release()
-            for t in threadsParaCheckear:
-                t.join()
+            rango = cola_de_urls.qsize()
         else:
-            threadsParaCheckear = []
-            for i in range(cantidad_de_threads):
-                thread = threading.Thread(target= checkearXSS, args=[cola_de_urls.get()])
-                threadsParaCheckear.append(thread)
-            for t in threadsParaCheckear:
-                t.start()
-            semaforo.release()
-            for t in threadsParaCheckear:
-                t.join()
+            rango = cantidad_de_threads
+
+        # creamos los threads que van a checkiar las urls
+        threadsParaCheckear = []
+        for i in range(rango):
+            thread = threading.Thread(target= checkearXSS, args=[cola_de_urls.get()])
+            threadsParaCheckear.append(thread)
+        for t in threadsParaCheckear:
+            t.start()
+        semaforo.release()
+        for t in threadsParaCheckear:
+            t.join()
 
 
 
