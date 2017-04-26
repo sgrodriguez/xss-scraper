@@ -21,41 +21,20 @@ class Database:
 
             xss_data = dict(url=url, names=names, metodo=metodo)
             xss_db[self.database_table].insert(xss_data)
+            print "YA TE LO ESCRIBI PA"
 
 
-def checkearPOST(url, names, codigo_malicioso):
-    form_data= {}
-
-    # Armamos el form 
-    # aca cargar previamente los payloads maliciosos
-    for name in names:
-        form_data[name] = '<script>alert("XssPrueba")</script>'
-
-    res = requests.get(url, data=form_data)
-    res.raise_for_status()
-    print "Ya envie la request"
-
-    # Buscamos si es vulnerable.
-    es_vulnerable = False
-    soup = bs4.BeautifulSoup(res.text,"html.parser")
-    try: 
-        scripts = soup.select('script')
-        for script in scripts:
-            if 'alert("XssPrueba")' in script:
-                es_vulnerable = True
-        return es_vulnerable            
-    except:
-
-        return es_vulnerable
-
-
-def checkearGET(url, names):
+def checkearMetodo(url, names, metodo):
     form_data= {}
     # aca cargar previamente los payloads maliciosos
     for name in names:
         form_data[name] = '<script>alert("XssPrueba")</script>'
-
-    res = requests.get(url, params=form_data)
+    
+    if metodo == "GET":
+        res = requests.get(url, params=form_data)
+    elif metodo == "POST":
+        res = requests.get(url, data=form_data)
+   
     res.raise_for_status()
     print "Ya envie la request"
 
@@ -79,34 +58,20 @@ def checkearXSS(url,database,lock):
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.text,"html.parser")
     forms = soup.select('form')
+
+
     for form in forms:
+        inputs = form.select('input')
+        names = []
+        for inpt in inputs:
+            name = inpt.get('name')
+            if name != None:
+                names.append(name)    
         metodo = form.get('method')
-        if metodo == "GET":
-
-            inputs = form.select('input')
-            names = []
-            for inpt in inputs:
-                name = inpt.get('name')
-                if name != None:
-                    names.append(name)
-            if checkearGET(url,names):
-                lock.acquire()
-                database.escribir(url,names,metodo)
-                lock.release()
-
-
-        elif metodo == "POST":
-
-            inputs = form.select('input')
-            names = []
-            for inpt in inputs:
-                name = inpt.get('name')
-                if name != None:
-                    names.append(name)
-            if checkearPOST(url,names):
-                lock.acquire()
-                database.escribir(url,names,metodo)
-                lock.release()
+        if checkearMetodo(url,names,metodo):
+            lock.acquire()
+            database.escribir(url,names,metodo)
+            lock.release()
 
 
 lock = threading.Lock()
