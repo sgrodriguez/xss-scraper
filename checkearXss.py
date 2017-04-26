@@ -1,85 +1,116 @@
 import sys
 import requests
 import bs4
-
-# GET TOMA PARAMS 
-# POST DATA
-
-def guardarUrl(url, form_data):
-	pass
+import dataset
+import threading
 
 
-def checkearGET(url,names):
+class Database:
 
-	form_data= {}
+    def __init__(self, domain):
+        self.database_table = domain 
+        
 
-	# Armamos el form 
-	for name in names:
-		form_data[name] = '<script>alert("XssPrueba")</script>'
+    def escribir(self, url, form_names, metodo):
+        with dataset.connect('sqlite:///xss-encontrados.db') as xss_db:
+            # Comprimamos todos los names en uno solo para tener
+            # una referencia a la hora que queramos replicar el ataque
+            names = form_names.pop()
+            for name in form_names:
+                names= names+'-'+name
 
-	res = requests.get(url, data=form_data)
-	res.raise_for_status()
-	print "Ya envie la request"
-	
-	# Buscamos si es vulnerable
-	soup = bs4.BeautifulSoup(res.text,"html.parser")
-	scripts = soup.select('script')
-	for script in scripts:
-		if 'alert("XssPrueba")' in script:
-			print "OWNED"
+            xss_data = dict(url=url, names=names, metodo=metodo)
+            xss_db[self.database_table].insert(xss_data)
 
 
-def checkearGET(url,names):
+def checkearPOST(url, names, codigo_malicioso):
+    form_data= {}
 
-	form_data= {}
+    # Armamos el form 
+    # aca cargar previamente los payloads maliciosos
+    for name in names:
+        form_data[name] = '<script>alert("XssPrueba")</script>'
 
-	for name in names:
-		form_data[name] = '<script>alert("XssPrueba")</script>'
+    res = requests.get(url, data=form_data)
+    res.raise_for_status()
+    print "Ya envie la request"
 
-	res = requests.get(url, params=form_data)
-	res.raise_for_status()
-	print "Ya envie la request"
+    # Buscamos si es vulnerable.
+    es_vulnerable = False
+    soup = bs4.BeautifulSoup(res.text,"html.parser")
+    try: 
+        scripts = soup.select('script')
+        for script in scripts:
+            if 'alert("XssPrueba")' in script:
+                es_vulnerable = True
+        return es_vulnerable            
+    except:
 
-	# Buscamos si es vulnerable.
-	soup = bs4.BeautifulSoup(res.text,"html.parser")
-	scripts = soup.select('script')
-	for script in scripts:
-		if 'alert("XssPrueba")' in script:
-			print "OWNED"
+        return es_vulnerable
 
 
-def checkearXSS(url):
+def checkearGET(url, names):
+    form_data= {}
+    # aca cargar previamente los payloads maliciosos
+    for name in names:
+        form_data[name] = '<script>alert("XssPrueba")</script>'
 
+    res = requests.get(url, params=form_data)
+    res.raise_for_status()
+    print "Ya envie la request"
+
+    # Buscamos si es vulnerable.
+    es_vulnerable = False
+    soup = bs4.BeautifulSoup(res.text,"html.parser")
+    try: 
+        scripts = soup.select('script')
+        for script in scripts:
+            if 'alert("XssPrueba")' in script:
+                es_vulnerable = True
+        return es_vulnerable
+                    
+    except:
+
+        return es_vulnerable
+
+
+def checkearXSS(url,database,lock):
     res = requests.get(url)
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.text,"html.parser")
     forms = soup.select('form')
     for form in forms:
-    	if form.get('method') == "GET":
+        metodo = form.get('method')
+        if metodo == "GET":
 
-    		inputs = form.select('input')
-    		names = []
-    		for inpt in inputs:
-    			name = inpt.get('name')
-    			if name != None:
-    				names.append(name)
-    		checkearGET(url,names)
-    		# si es vulnberabe guardalo en la db
-
-    	elif form.get('method') == "POST":
-
-    		inputs = form.select('input')
-    		names = []
-    		for inpt in inputs:
-    			name = inpt.get('name')
-    			if name != None:
-    				names.append(name)
-    		checkearPOST(url,names)
-    		# si es vulnberabe guardalo en la db
+            inputs = form.select('input')
+            names = []
+            for inpt in inputs:
+                name = inpt.get('name')
+                if name != None:
+                    names.append(name)
+            if checkearGET(url,names):
+                lock.acquire()
+                database.escribir(url,names,metodo)
+                lock.release()
 
 
+        elif metodo == "POST":
+
+            inputs = form.select('input')
+            names = []
+            for inpt in inputs:
+                name = inpt.get('name')
+                if name != None:
+                    names.append(name)
+            if checkearPOST(url,names):
+                lock.acquire()
+                database.escribir(url,names,metodo)
+                lock.release()
 
 
+lock = threading.Lock()
+database = Database('xss-game')
 url = "http://xss-game.appspot.com/level1/frame?"
-checkearXSS(url)
+checkearXSS(url,database,lock)
 print "Ya la chequie"
