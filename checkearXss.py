@@ -1,28 +1,12 @@
 import sys
 import requests
 import bs4
-import dataset
+import Database
 import threading
 
+from urlparse import urlparse, urljoin
 
-class Database:
-
-    def __init__(self, domain):
-        self.database_table = domain 
-        
-
-    def escribir(self, url, form_names, metodo):
-        with dataset.connect('sqlite:///xss-encontrados.db') as xss_db:
-            # Comprimamos todos los names en uno solo para tener
-            # una referencia a la hora que queramos replicar el ataque
-            names = form_names.pop()
-            for name in form_names:
-                names= names+'-'+name
-
-            xss_data = dict(url=url, names=names, metodo=metodo)
-            xss_db[self.database_table].insert(xss_data)
-            print "YA TE LO ESCRIBI PA"
-
+from clase_database.database import Database
 
 def checkearMetodo(url, names, metodo):
     form_data= {}
@@ -53,12 +37,18 @@ def checkearMetodo(url, names, metodo):
         return es_vulnerable
 
 
-def checkearXSS(url,database,lock):
+def checkearXSS(url, database, *args):
+    xss_encontrado = False
+    hayLock = False
+
+    if len(args) > 0:
+        hayLock = True
+        lock = args[0]
+
     res = requests.get(url)
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.text,"html.parser")
     forms = soup.select('form')
-
 
     for form in forms:
         inputs = form.select('input')
@@ -69,13 +59,21 @@ def checkearXSS(url,database,lock):
                 names.append(name)    
         metodo = form.get('method')
         if checkearMetodo(url,names,metodo):
-            lock.acquire()
-            database.escribir(url,names,metodo)
-            lock.release()
+            xss_encontrado = True
+            if hayLock:
+                lock.acquire()
+                database.escribir(url,names,metodo)
+                lock.release()
+            else:
+                database.escribir(url,names,metodo)
+
+    # if checkearMetodo(url,,"GET"):
+    #     lock.acquire()
+    #     database.escribir(url,names,"GET")
+    #     lock.release()
+    return xss_encontrado
 
 
 lock = threading.Lock()
 database = Database('xss-game')
-url = "http://xss-game.appspot.com/level1/frame?"
-checkearXSS(url,database,lock)
-print "Ya la chequie"
+url = "http://google-gruyere.appspot.com/339000360975/"
