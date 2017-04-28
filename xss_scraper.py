@@ -76,58 +76,55 @@ def xsscraper(url, cantidad_de_threads, *args):
     dominio_original = urlparse(url).netloc
     # Creamos instancia de la de database
     database = Database(dominio_original)
-    if checkearXSS(url,database):
-        cjto_urls_no_visitadas = set()
-        cjto_urls_visitadas = set()
-        cola_de_urls = Queue.Queue()
-        cjto_urls_visitadas.add(url)
 
-        agregarUrlsVecinas(url, dominio_original, cjto_urls_no_visitadas, cjto_urls_visitadas)
+    cjto_urls_no_visitadas = set()
+    cjto_urls_visitadas = set()
+    cola_de_urls = Queue.Queue()
+    cjto_urls_no_visitadas.add(url)
 
+    # creamos el thread checkiador de urls que se va a 
+    # encargar de lanzar los threads que analizan si una 
+    # url es vulnerable a xss
+    semaforo = threading.Semaphore()
+    thread_checkiador_de_urls = threading.Thread(target=checkiadorDeUrls, args=[cola_de_urls, 
+                                                                                cjto_urls_no_visitadas, 
+                                                                                cantidad_de_threads, 
+                                                                                semaforo,
+                                                                                database])
+    thread_checkiador_de_urls.start()
 
-        # creamos el thread checkiador de urls que se va a 
-        # encargar de lanzar los threads que analizan si una 
-        # url es vulnerable a xss
-        semaforo = threading.Semaphore()
-        thread_checkiador_de_urls = threading.Thread(target=checkiadorDeUrls, args=[cola_de_urls, 
-                                                                                    cjto_urls_no_visitadas, 
-                                                                                    cantidad_de_threads, 
-                                                                                    semaforo,
-                                                                                    database])
-        thread_checkiador_de_urls.start()
+    while not len(cjto_urls_no_visitadas) == 0:
+        if existe_cota and len(cjto_urls_no_visitadas) > cota_maxima_de_urls:
+            break
 
-        while not len(cjto_urls_no_visitadas) == 0:
-            if existe_cota and len(cjto_urls_no_visitadas) > cota_maxima_de_urls:
-                break
+        if len(cjto_urls_no_visitadas) < cantidad_de_threads:
+            cant_urls_a_encolar = len(cjto_urls_no_visitadas)
+        else:
+            cant_urls_a_encolar = cantidad_de_threads
 
-            if len(cjto_urls_no_visitadas) < cantidad_de_threads:
-                cant_urls_a_encolar = len(cjto_urls_no_visitadas)
-            else:
-                cant_urls_a_encolar = cantidad_de_threads
-
-            urls_a_visitar = []
-            semaforo.acquire()
-            for i in range(cant_urls_a_encolar):
-                proxima_url_a_checkiar = cjto_urls_no_visitadas.pop()
-                urls_a_visitar.append(proxima_url_a_checkiar)
-                cjto_urls_visitadas.add(proxima_url_a_checkiar)
-                cola_de_urls.put(proxima_url_a_checkiar)
-            semaforo.release()
-
-            # Buscamos los vecinos
-            for url in urls_a_visitar:
-                agregarUrlsVecinas(url, dominio_original, cjto_urls_no_visitadas, cjto_urls_visitadas)
-
-        # Si nos pasamos de la cota de urls no seguimos buscando vecinosy 
-        # pasamos a la cola todas las urls que nos faltan verificar
+        urls_a_visitar = []
         semaforo.acquire()
-        for i in range(len(cjto_urls_no_visitadas)):
-            cola_de_urls.put(cjto_urls_no_visitadas.pop())
+        for i in range(cant_urls_a_encolar):
+            proxima_url_a_checkiar = cjto_urls_no_visitadas.pop()
+            urls_a_visitar.append(proxima_url_a_checkiar)
+            cjto_urls_visitadas.add(proxima_url_a_checkiar)
+            cola_de_urls.put(proxima_url_a_checkiar)
         semaforo.release()
 
-        # Una vez que ya vimos todas las url esperamos a que terminen de analizarse
-        thread_checkiador_de_urls.join()
-        print "Termine, Analize "+str(len(cjto_urls_visitadas))+" urls"
+        # Buscamos los vecinos
+        for url in urls_a_visitar:
+            agregarUrlsVecinas(url, dominio_original, cjto_urls_no_visitadas, cjto_urls_visitadas)
+
+    # Si nos pasamos de la cota de urls no seguimos buscando vecinosy 
+    # pasamos a la cola todas las urls que nos faltan verificar
+    semaforo.acquire()
+    for i in range(len(cjto_urls_no_visitadas)):
+        cola_de_urls.put(cjto_urls_no_visitadas.pop())
+    semaforo.release()
+
+    # Una vez que ya vimos todas las url esperamos a que terminen de analizarse
+    thread_checkiador_de_urls.join()
+    print "Termine, Analize "+str(len(cjto_urls_visitadas))+" urls"
 
 
 if __name__ == '__main__':

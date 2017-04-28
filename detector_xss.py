@@ -14,13 +14,13 @@ def requestAceptada(url, metodo, *args):
         form_data = args[0]
     
     try:
-        if metodo == "get":
+        if metodo.lower() == "get":
             if hayParams:
                 res = requests.get(url, params=form_data)
             else:
                 res = requests.get(url)
             return res
-        elif metodo == "post":
+        elif metodo.lower() == "post":
             if hayParams:
                 res = requests.post(url, data=form_data)
             else:
@@ -57,13 +57,8 @@ def checkearMetodo(url, names, metodo):
         return es_vulnerable
 
 
-def checkearXSS(url, database, *args):
+def checkearXSS(url, database, lock):
     xss_encontrado = False
-    hayLock = False
-
-    if len(args) > 0:
-        hayLock = True
-        lock = args[0]
 
     res = requestAceptada(url, "get")
     if res == None:
@@ -78,26 +73,20 @@ def checkearXSS(url, database, *args):
         for inpt in inputs:
             name = inpt.get('name')
             if name != None:
-                names.append(name)    
-        metodo = form.get('method').lower()
+                names.append(name)  
+        metodo = form.get('method')
         if checkearMetodo(url,names,metodo):
             print "Vulnerabilidad encontrada en "+url+" guardando en db"
             xss_encontrado = True
-            if hayLock:
-                lock.acquire()
-                database.escribir(url,names,metodo)
-                lock.release()
-            else:
-                database.escribir(url,names,metodo)
+            lock.acquire()
+            database.escribir(url,names,metodo)
+            lock.release()
 
     if checkearMetodo(url,[],"get"):
         print "Vulnerabilidad encontrada en "+url+" guardando en db"
         xss_encontrado = True
-        if hayLock:
-            lock.acquire()
-            database.escribir(url,['requestSinParametros'],"get")
-            lock.release()
-        else:
-            database.escribir(url,['requestSinParametros'],"get")
+        lock.acquire()
+        database.escribir(url,['requestSinParametros'],"get")
+        lock.release()
 
     return xss_encontrado
