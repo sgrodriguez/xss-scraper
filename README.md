@@ -28,11 +28,11 @@ python xss_scraper.py [U] [T] [C]
 python xss_scraper.py https://google-gruyere.appspot.com/584007498737/ 5 20
 ```
 
-En xss_scraper.py se encuentra las funciones destinadas a buscar urls y lanzar threads que checkean xss,
-en detectar_xss.py estan las funciones destinadas a encontrar xss dada una url y por ultimo en clase_database se encuentra la clase encargada de guardar en la db los resultados obtenidos.
+En xss_scraper.py se encuentran las funciones destinadas a buscar urls y lanzar threads que checkean xss,
+en detectar_xss.py estan las funciones destinadas a detectar xss dada una url y por ultimo en clase_database se encuentra la clase encargada de guardar en la db los resultados obtenidos.
 
 # TODO
 
-* Agregarle Test
-* Poder cargar payloads desde archivo
+* Agregarle Tests
+* Dar la posibilidad de usar custom payloads
 * Poner mejores nombres a los archivos
