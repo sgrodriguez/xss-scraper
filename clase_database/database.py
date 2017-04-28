@@ -8,7 +8,7 @@ class Database:
         
 
     def escribir(self, url, form_names, metodo):
-        with dataset.connect('sqlite:///xss-encontrados.db') as xss_db:
+        with dataset.connect('sqlite:///xss_encontrados.db') as xss_db:
             # Comprimamos todos los names en uno solo para tener
             # una referencia a la hora que queramos replicar el ataque
             names = form_names.pop()
@@ -17,4 +17,3 @@ class Database:
 
             xss_data = dict(url=url, names=names, metodo=metodo)
             xss_db[self.database_table].insert(xss_data)
-            print "YA TE LO ESCRIBI PA"
