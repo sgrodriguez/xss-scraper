@@ -2,11 +2,34 @@
 import sys
 import requests
 import bs4
-import Database
 import threading
 
 from urlparse import urlparse, urljoin
 from clase_database.database import Database
+
+def requestAceptada(url, metodo, *args):
+    hayParams = False
+    if len(args) > 0:
+        hayParams = True
+        form_data = args[0]
+    
+    try:
+        if metodo == "get":
+            if hayParams:
+                res = requests.get(url, params=form_data)
+            else:
+                res = requests.get(url)
+            return res
+        elif metodo == "post":
+            if hayParams:
+                res = requests.post(url, data=form_data)
+            else:
+                res = requests.post(url)  
+            return res
+        else:
+            return None
+    except:
+        return None  
 
 
 def checkearMetodo(url, names, metodo):
@@ -19,15 +42,9 @@ def checkearMetodo(url, names, metodo):
     if len(names) == 0:
         url = url+codigo_a_inyectar
 
-    if metodo == "get":
-        res = requests.get(url, params=form_data)
-    elif metodo == "post":
-        res = requests.get(url, data=form_data)
-    else:
-        print "Metodo no soportado "+metodo
-        return es_vulnerable
-
-    res.raise_for_status()
+    res = requestAceptada(url, metodo, form_data)
+    if res == None:
+        return False 
     html_text = bs4.BeautifulSoup(res.text,"html.parser")
     try: 
         scripts = html_text.select('script')
@@ -48,8 +65,10 @@ def checkearXSS(url, database, *args):
         hayLock = True
         lock = args[0]
 
-    res = requests.get(url)
-    res.raise_for_status()
+    res = requestAceptada(url, "get")
+    if res == None:
+        return False 
+
     html_text = bs4.BeautifulSoup(res.text,"html.parser")
     forms = html_text.select('form')
 

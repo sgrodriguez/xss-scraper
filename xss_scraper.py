@@ -5,12 +5,11 @@ import bs4
 import threading
 import time
 import Queue
-import Database
 
 from urlparse import urlparse, urljoin
 
 from clase_database.database import Database
-from detector_xss import checkearXSS
+from detector_xss import checkearXSS, requestAceptada
 
 
 def es_relativo(url):
@@ -18,27 +17,29 @@ def es_relativo(url):
 
 
 def agregarUrlsVecinas(url, dominio_original, cjto_urls_no_visitadas, cjto_urls_visitadas):
-
-    res = requests.get(url)
-    res.raise_for_status()
+    
+    res = requestAceptada(url,"get")
+    if res == None:
+        return
 
     url_html = bs4.BeautifulSoup(res.text,"html.parser")
     links = url_html.select('a')
 
     for link in links:
         link_parseado = link.get('href')
-        if es_relativo(link_parseado):
-            url_nueva = urljoin(url, link_parseado)
-            if url_nueva not in cjto_urls_visitadas:
-                cjto_urls_no_visitadas.add(url_nueva)
-        else:
-            try:
+        try:
+            if es_relativo(link_parseado):
+                url_nueva = urljoin(url, link_parseado)
+                if url_nueva not in cjto_urls_visitadas:
+                    cjto_urls_no_visitadas.add(url_nueva)
+            else:
                 dominio_del_link_parseado = urlparse(link_parseado).netloc
                 if dominio_del_link_parseado == dominio_original:
                     if link_parseado not in cjto_urls_visitadas:
                         cjto_urls_no_visitadas.add(link_parseado)
-            except AttributeError:
-                pass
+        except AttributeError:
+            print "Error Tratando de parsear url"
+            pass
 
 
 def checkiadorDeUrls(cola_de_urls,cjto_urls_no_visitadas,cantidad_de_threads,semaforo, database):
@@ -63,7 +64,6 @@ def checkiadorDeUrls(cola_de_urls,cjto_urls_no_visitadas,cantidad_de_threads,sem
             t.start()
         for t in threads_para_checkiar:
             t.join()
-
 
 
 def xsscraper(url, cantidad_de_threads, *args):
